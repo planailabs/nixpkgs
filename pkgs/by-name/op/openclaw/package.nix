@@ -11,7 +11,7 @@
   versionCheckHook,
   rolldown,
   installShellFiles,
-  version ? "2026.5.12",
+  version ? "2026.5.22",
 }:
 let
   pnpm = pnpm_11.override { nodejs = nodejs_22; };
@@ -24,10 +24,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     owner = "openclaw";
     repo = "openclaw";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-URuoljISNcDLuWUwOpZoFjPNVOmbThC9r00uShPR4Co=";
+    hash = "sha256-SllmrkkbIFwznUhZ6zogmQ91oCao6d0fMI5473jjrU0=";
   };
 
-  pnpmDepsHash = "sha256-pLQoA9eyHD84E0Rp8MMqfu95tGJtDEMbY+fh0nHjdWo=";
+  pnpmDepsHash = "sha256-WEhTiT4BBK8UfaOfzhqmgMq/bP+DtkdQ86MFcUnFsV4=";
 
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) pname version src;
