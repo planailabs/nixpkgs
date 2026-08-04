@@ -22,6 +22,7 @@ rustPlatform.buildRustPackage {
   cargoBuildFlags = [ "--package=buzz-cli" ];
   cargoTestFlags = [ "--package=buzz-cli" ];
 
+  # reqwest initializes its rustls client in tests and needs a CA bundle.
   nativeCheckInputs = [ cacert ];
 
   meta = {
@@ -30,6 +31,6 @@ rustPlatform.buildRustPackage {
     license = lib.licenses.asl20;
     mainProgram = "buzz";
     maintainers = [ lib.maintainers.sebfried ];
-    platforms = lib.platforms.linux;
+    platforms = lib.platforms.linux ++ lib.platforms.darwin;
   };
 }
