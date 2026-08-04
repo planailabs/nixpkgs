@@ -7,14 +7,14 @@
 
 let
   pname = "buzz-desktop";
-  version = "0.5.3";
+  version = "0.5.4";
 
   src = fetchurl {
     url = "https://github.com/block/buzz/releases/download/desktop-v${version}/Buzz_${version}_amd64.AppImage";
-    hash = "sha256-XchCo9rjISX7Zisy4ePdumXi+xySd0Tfu3vKfqJMwuM=";
+    hash = "sha256-Aho/xwEzJk9eDFtE2SYmt1Egsdm2REOstXa6jYwAnME=";
   };
 
-  appimageContents = appimageTools.extractType2 {
+  appimageContents = appimageTools.extract {
     inherit pname version src;
 
     postExtract = ''
@@ -43,6 +43,9 @@ appimageTools.wrapAppImage {
   extraInstallCommands = ''
     install -Dm444 ${appimageContents}/usr/share/applications/Buzz.desktop \
       $out/share/applications/buzz-desktop.desktop
+    substituteInPlace $out/share/applications/buzz-desktop.desktop \
+      --replace-fail "Exec=buzz-desktop" "Exec=buzz-desktop %u" \
+      --replace-fail "Categories=" "Categories=Network;Chat;"
     cp -r ${appimageContents}/usr/share/icons $out/share/
   '';
 
@@ -63,6 +66,7 @@ appimageTools.wrapAppImage {
     changelog = "https://github.com/block/buzz/releases/tag/desktop-v${version}";
     license = lib.licenses.asl20;
     mainProgram = "buzz-desktop";
+    maintainers = [ lib.maintainers.sebfried ];
     platforms = [ "x86_64-linux" ];
   };
 }
