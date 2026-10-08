@@ -956,6 +956,7 @@ in
   };
   kaidan = runTest ./kaidan;
   kanboard = runTest ./web-apps/kanboard.nix;
+  kanbn = runTest ./web-apps/kanbn.nix;
   kanidm = runTest ./kanidm.nix;
   kanidm-provisioning = runTest ./kanidm-provisioning.nix;
   kapla = runTest ./kapla.nix;
