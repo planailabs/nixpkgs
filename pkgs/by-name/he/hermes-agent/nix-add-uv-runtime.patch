@@ -1,0 +1,18 @@
+--- a/nix/hermes-agent.nix
++++ b/nix/hermes-agent.nix
+@@ -13,6 +13,7 @@
+   git,
+   openssh,
+   ffmpeg,
++  uv,
+ 
+   # linux-only deps
+   wl-clipboard,
+@@ -146,6 +147,7 @@
+     git
+     openssh
+     ffmpeg
++    uv
+   ]
+   ++ lib.optionals stdenv.isLinux [
+     wl-clipboard
