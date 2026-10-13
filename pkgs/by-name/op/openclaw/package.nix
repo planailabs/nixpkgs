@@ -1,20 +1,77 @@
 {
   lib,
   stdenvNoCC,
+  stdenv,
   buildPackages,
   fetchFromGitHub,
+  fetchurl,
   fetchPnpmDeps,
   pnpmConfigHook,
-  pnpm_11,
-  nodejs-slim_22,
+  pnpm_12,
+  nodejs-slim_24,
   makeWrapper,
   versionCheckHook,
-  rolldown,
+  autoPatchelfHook,
   installShellFiles,
-  version ? "2026.6.33",
+  procps,
+  ncurses,
+  libx11,
+  libxi,
+  libxkbcommon,
+  gtk3,
+  webkitgtk_4_1,
+  libsoup_3,
+  cairo,
+  gdk-pixbuf,
+  glib,
+  wayland,
+  dbus,
+  xdotool,
+  version ? "2026.10.2",
 }:
 let
-  pnpm = pnpm_11.override { nodejs-slim = nodejs-slim_22; };
+  pnpm = pnpm_12.override { nodejs-slim = nodejs-slim_24; };
+
+  # Downgrade xdotool locally to version 3: Copilot's bundled webview
+  # needs libxdo.so.3, while nixpkgs' xdotool 4 provides libxdo.so.4.
+  xdotoolCompat = xdotool.overrideAttrs {
+    version = "3.20211022.1";
+    src = fetchFromGitHub {
+      owner = "jordansissel";
+      repo = "xdotool";
+      tag = "v3.20211022.1";
+      hash = "sha256-XFiaiHHtUSNFw+xhUR29+2RUHOa+Eyj1HHfjCUjwd9k=";
+    };
+  };
+
+  matrixCryptoFilename =
+    {
+      "x86_64-linux" =
+        if stdenvNoCC.hostPlatform.isMusl then
+          "matrix-sdk-crypto.linux-x64-musl.node"
+        else
+          "matrix-sdk-crypto.linux-x64-gnu.node";
+      "aarch64-linux" =
+        assert
+          !stdenvNoCC.hostPlatform.isMusl || throw "openclaw: Matrix crypto does not support aarch64-musl";
+        "matrix-sdk-crypto.linux-arm64-gnu.node";
+      "x86_64-darwin" = "matrix-sdk-crypto.darwin-x64.node";
+      "aarch64-darwin" = "matrix-sdk-crypto.darwin-arm64.node";
+    }
+    .${stdenvNoCC.hostPlatform.system};
+
+  matrixCrypto = fetchurl {
+    url = "https://github.com/matrix-org/matrix-rust-sdk-crypto-nodejs/releases/download/v0.6.6/${matrixCryptoFilename}";
+    hash =
+      {
+        "matrix-sdk-crypto.linux-x64-gnu.node" = "sha256-rrIQKaxrspzQZJP2exmlp1s9A3Ghq0Uv5Z94JJNQ8Pc=";
+        "matrix-sdk-crypto.linux-x64-musl.node" = "sha256-41fCtYgB5Il0zavQ+3bvLMeXLIRcQbtQGRoNbqA2O8o=";
+        "matrix-sdk-crypto.linux-arm64-gnu.node" = "sha256-xDw0fzl4buny0Rta4wiNGCwagWNvK2jcIpf+Zxa+KJE=";
+        "matrix-sdk-crypto.darwin-x64.node" = "sha256-SiKjUemIue0ekGILNHTldjJc5Sh/YjNRtrLpz68HjCw=";
+        "matrix-sdk-crypto.darwin-arm64.node" = "sha256-mdx9kKqDDZttlrzaI1ic4Pty0Q+E7ER8nSQZN/7obZ8=";
+      }
+      .${matrixCryptoFilename};
+  };
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "openclaw";
@@ -24,45 +81,119 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     owner = "openclaw";
     repo = "openclaw";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-OdH5olBLDGQYCtR2ElbzcQ2+Hgy3cZDixkIwmSPh9Xw=";
+    hash = "sha256-zJ5lnF5HmLfhIrbAYTYatwuTDpDxEP92YGK1A3Y6Ki8=";
   };
 
-  pnpmDepsHash = "sha256-eVyR8SVp0SyjflFomvgn9dgAqvXIUgjCYc5NICxxIg8=";
+  pnpmDepsHash = "sha256-3O4XBoV71Ef9KEGDXmBMfRodrWym5aGc8NkTYeTWBZQ=";
 
   pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs) pname version src;
+    inherit (finalAttrs)
+      pname
+      version
+      src
+      ;
     inherit pnpm;
+    prePnpmInstall = ''
+      pnpm config set fetch-retries 5
+      pnpm config set fetch-timeout 1200000
+      pnpm config set network-concurrency 8
+    '';
     fetcherVersion = 4;
     hash = finalAttrs.pnpmDepsHash;
   };
 
-  buildInputs = [ rolldown ];
+  pnpmInstallFlags = lib.optionals stdenv.hostPlatform.isLinux [
+    "--libc=${if stdenvNoCC.hostPlatform.isMusl then "musl" else "glibc"}"
+  ];
+
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
+    stdenv.cc.cc.lib
+    ncurses
+    libx11
+    libxi
+    libxkbcommon
+    gtk3
+    webkitgtk_4_1
+    libsoup_3
+    cairo
+    gdk-pixbuf
+    glib
+    wayland
+    dbus
+    xdotoolCompat
+  ];
 
   nativeBuildInputs = [
     pnpmConfigHook
     pnpm
-    nodejs-slim_22
+    nodejs-slim_24
     makeWrapper
     installShellFiles
+  ]
+  ++ lib.optional stdenv.hostPlatform.isLinux autoPatchelfHook
+  # The bundled-plugin-asset hooks are spawned detached and reaped via
+  # `ps` (scripts/lib/managed-child-process.mts); without it the zombie
+  # check cannot run and `pnpm build` aborts with "Managed command exited
+  # while its process group remained active".
+  ++ lib.optional stdenv.hostPlatform.isLinux procps;
+
+  # Stripping the bundled Node SEA executable corrupts its embedded payload.
+  stripExclude = [
+    "lib/openclaw/node_modules/.pnpm/@github+copilot-*/node_modules/@github/copilot-*/copilot"
   ];
 
+  # Koffi ships both libc variants in one platform package. Keep only the
+  # host variant so autoPatchelf does not inspect an incompatible binary.
   buildPhase = ''
     runHook preBuild
 
-    pnpm install --frozen-lockfile
+    ${lib.optionalString stdenv.hostPlatform.isLinux ''
+      koffiCpu=${if stdenvNoCC.hostPlatform.isAarch64 then "arm64" else "x64"}
+      koffiLibcDir=${if stdenvNoCC.hostPlatform.isMusl then "linux" else "musl"}_$koffiCpu
+      rm -rf node_modules/.pnpm/@koromix+koffi-linux-*@*/node_modules/@koromix/koffi-linux-*/$koffiLibcDir
+    ''}
 
-    # Replace pnpm-installed rolldown with the Nix-built version
-    rm -rf node_modules/rolldown node_modules/@rolldown/pluginutils
-    mkdir -p node_modules/@rolldown node_modules/.pnpm/node_modules/@rolldown
-    cp -r ${rolldown}/lib/node_modules/rolldown node_modules/rolldown
-    cp -r ${rolldown}/lib/node_modules/@rolldown/pluginutils node_modules/@rolldown/pluginutils
-    cp -r ${rolldown}/lib/node_modules/rolldown node_modules/.pnpm/node_modules/rolldown
-    cp -r ${rolldown}/lib/node_modules/@rolldown/pluginutils node_modules/.pnpm/node_modules/@rolldown/pluginutils
-    chmod -R u+w node_modules/rolldown node_modules/@rolldown/pluginutils \
-      node_modules/.pnpm/node_modules/rolldown node_modules/.pnpm/node_modules/@rolldown/pluginutils
+    for matrixCryptoDir in node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-nodejs@0.6.6*/node_modules/@matrix-org/matrix-sdk-crypto-nodejs; do
+      install -m644 ${matrixCrypto} "$matrixCryptoDir/${matrixCryptoFilename}"
+      printf 0.6.6 > "$matrixCryptoDir/${matrixCryptoFilename}.version"
+    done
 
-    pnpm build
-    pnpm ui:build
+    ${lib.optionalString stdenv.hostPlatform.isLinux ''
+      # 2026.9.8 bundles a prebuilt musl @openai/codex voice runtime. Its
+      # libraries resolve each other through their own directory, so
+      # autoPatchelf would point their RPATH at a /build path (which
+      # audit-tmpdir then rejects) and cannot handle the static ones at all.
+      # They are self-contained vendor blobs, so keep them out of the run.
+      codexVoiceDirs=$(find node_modules -type d -path '*codex-resources/voice' 2>/dev/null || true)
+      for d in $codexVoiceDirs; do
+        mv "$d" "$d.hold"
+      done
+      autoPatchelf node_modules
+      for d in $codexVoiceDirs; do
+        mv "$d.hold" "$d"
+      done
+
+      # Several prebuilt vendor modules in 2026.9.8 (onnxruntime-node's binding,
+      # bare-url's .bare blobs, some tree-sitter builds, ...) carry RPATHs
+      # pointing into the build tree. autoPatchelf cannot fix them (some are
+      # static, others resolve siblings by directory), and audit-tmpdir rejects
+      # the /build reference in fixupPhase. Drop those RPATHs so the audit
+      # passes; these blobs are loaded by absolute path or via LD_LIBRARY_PATH
+      # at runtime and do not rely on RPATH.
+      find node_modules -type f \( -name '*.node' -o -name '*.so' -o -name '*.so.*' -o -name '*.bare' \) -print0 \
+        | xargs -0 -r -n1 sh -c '
+            rpath=$(patchelf --print-rpath "$0" 2>/dev/null) || exit 0
+            case "$rpath" in
+              *"$NIX_BUILD_TOP"*)
+                chmod u+w "$0" 2>/dev/null || true
+                patchelf --remove-rpath "$0" 2>/dev/null || true
+                ;;
+            esac
+          '
+    ''}
+
+    pnpm install --offline --frozen-lockfile ${lib.escapeShellArgs finalAttrs.pnpmInstallFlags}
+    OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=8192 pnpm build
 
     runHook postBuild
   '';
@@ -73,13 +204,13 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     libdir=$out/lib/openclaw
     mkdir -p $libdir $out/bin
 
-
-    cp --reflink=auto -r package.json dist node_modules $libdir/
+    cp --reflink=auto -r package.json dist node_modules packages $libdir/
     cp --reflink=auto -r docs skills patches extensions qa $libdir/
     mkdir -p $libdir/src
     cp --reflink=auto -r src/agents $libdir/src/
 
-    rm -f $libdir/node_modules/.pnpm/node_modules/clawdbot \
+    rm -f $libdir/node_modules/.pnpm/node_modules/@openclaw/example-ai-chat \
+      $libdir/node_modules/.pnpm/node_modules/clawdbot \
       $libdir/node_modules/.pnpm/node_modules/moltbot \
       $libdir/node_modules/.pnpm/node_modules/openclaw-control-ui
 
@@ -88,9 +219,12 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # Remove symlinks pointing back to the build sandbox
     find $libdir/dist/extensions -type l -lname "$NIX_BUILD_TOP/*" -delete
 
-    makeWrapper ${lib.getExe nodejs-slim_22} $out/bin/openclaw \
+    makeWrapper ${lib.getExe nodejs-slim_24} $out/bin/openclaw \
       --add-flags "$libdir/dist/index.js" \
-      --set NODE_PATH "$libdir/node_modules"
+      --set NODE_PATH "$libdir/node_modules" \
+      --prefix PATH : ${
+        lib.makeBinPath [ nodejs-slim_24 ]
+      }
     ln -s $out/bin/openclaw $out/bin/moltbot
     ln -s $out/bin/openclaw $out/bin/clawdbot
 
@@ -129,14 +263,28 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     '';
     homepage = "https://openclaw.ai";
     changelog = "https://github.com/openclaw/openclaw/releases/tag/${finalAttrs.src.tag}";
-    license = lib.licenses.mit;
+    # This output bundles the separately licensed Claude SDK/runtime
+    # alongside OpenClaw's MIT-licensed code.
+    # It also bundles the separately licensed GitHub Copilot CLI/runtime.
+    license = with lib.licenses; [
+      mit
+      unfree
+    ];
+    sourceProvenance = with lib.sourceTypes; [
+      fromSource
+      binaryNativeCode
+    ];
     mainProgram = "openclaw";
     maintainers = with lib.maintainers; [
       chrisportela
       mkg20001
       nikhilmaddirala
     ];
-    platforms = with lib.platforms; linux ++ darwin;
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+      "aarch64-darwin"
+    ];
     knownVulnerabilities = [
       "Project uses LLMs to parse untrusted content, making it vulnerable to prompt injection, while having full access to system by default."
     ];
