@@ -5,6 +5,7 @@
   nixDependencies,
   generateSplicesForMkScope,
   fetchFromGitHub,
+  fetchgit,
   runCommand,
   pkgs,
   pkgsi686Linux,
@@ -211,11 +212,13 @@ lib.makeExtensible (
 
       nixComponents_git =
         let
-          src = fetchFromGitHub {
-            owner = "NixOS";
-            repo = "nix";
-            rev = "979a87c97bef7b96cd4ec4b142188089851e47ad";
-            hash = "sha256-B9oFHwWHisWIvsjo7jeoke0OzxRYZYFhpBm/ancphUk=";
+          # plan-ai fork of Nix: current NixOS/nix master plus the
+          # `nix profile replace` feature (the mimalloc work is upstream now).
+          # Mirrored at https://git.plan.ai/plan-ai/nix
+          src = fetchgit {
+            url = "https://git.plan.ai/plan-ai/nix.git";
+            rev = "6c06d07cf30359ce573e2eb6fe22f90810b235e3";
+            hash = "sha256-BYxTOeLHRkFZqpN6aDdeR9WpOZxDVoXuEpPPsQgbQSM=";
           };
         in
         (nixDependencies.callPackage ./modular/packages.nix {
@@ -228,10 +231,10 @@ lib.makeExtensible (
 
       git = addTests "git" self.nixComponents_git.nix-everything;
 
-      latest = self.nix_2_35;
+      latest = self.git;
 
       # Read ./README.md before bumping a major release
-      stable = addFallbackPathsCheck self.nix_2_34;
+      stable = self.git;
     }
     // lib.optionalAttrs config.allowAliases (
       lib.listToAttrs (
