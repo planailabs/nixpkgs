@@ -15,20 +15,20 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "mcporter";
-  version = "0.15.0";
+  version = "0.16.0";
 
   src = fetchFromGitHub {
     owner = "openclaw";
     repo = "mcporter";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-ilTScTb1vE5V4Qzh4aLa3bPGbv/khx1abvZs1rNvDsM=";
+    hash = "sha256-ns5QsyLStBUIO6ove55CZFPbUFHsKKdBSUP+dXWWjCo=";
   };
 
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) pname version src;
     inherit pnpm;
     fetcherVersion = 3;
-    hash = "sha256-9sY8rfXf/y+XI8Jl+zIN0B3tq7FxBhYcejKx1yMcKj4=";
+    hash = "sha256-iVP46rt0bx/cWvnQblBnhgM1wvOe69ce7JHGPNNiilg=";
   };
 
   nativeBuildInputs = [
