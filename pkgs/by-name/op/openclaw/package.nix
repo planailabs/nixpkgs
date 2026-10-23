@@ -6,15 +6,15 @@
   fetchPnpmDeps,
   pnpmConfigHook,
   pnpm_11,
-  nodejs-slim_24,
+  nodejs-slim_26,
   makeWrapper,
   versionCheckHook,
   rolldown,
   installShellFiles,
-  version ? "2026.10.5",
+  version ? "2026.10.6",
 }:
 let
-  pnpm = pnpm_11.override { nodejs-slim = nodejs-slim_24; };
+  pnpm = pnpm_11.override { nodejs-slim = nodejs-slim_26; };
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "openclaw";
@@ -24,7 +24,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     owner = "openclaw";
     repo = "openclaw";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-+Bqk2u4hDiyqK1upJ96tc6Zu5dDNjIl/yhKtMB1XUZw=";
+    hash = "sha256-bobJYn46LJzAmo9Naz6W3nla1rsVGPiptYpHxTegneg=";
   };
 
   pnpmDepsHash = "sha256-wOuGt0xrVC5MUJ2xn4erfkkl20TsMqIsjuLAMOSMAes=";
@@ -48,7 +48,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     pnpmConfigHook
     pnpm
-    nodejs-slim_24
+    nodejs-slim_26
     makeWrapper
     installShellFiles
   ];
@@ -96,7 +96,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # Remove symlinks pointing back to the build sandbox
     find $libdir/dist/extensions -type l -lname "$NIX_BUILD_TOP/*" -delete
 
-    makeWrapper ${lib.getExe nodejs-slim_24} $out/bin/openclaw \
+    makeWrapper ${lib.getExe nodejs-slim_26} $out/bin/openclaw \
       --add-flags "$libdir/dist/index.js" \
       --set NODE_PATH "$libdir/node_modules"
     ln -s $out/bin/openclaw $out/bin/moltbot
