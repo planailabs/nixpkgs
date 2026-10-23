@@ -111,12 +111,12 @@ let
   # vendored in-tree. Pre-stage the pin (tracks upstream's
   # `LLAMA_CPP_VERSION` file) so the FetchContent step uses our copy
   # instead of trying to clone over the network in the sandbox.
-  llamaCppVersion = "b11669";
+  llamaCppVersion = "b11803";
   llamaCppSrc = fetchFromGitHub {
     owner = "ggml-org";
     repo = "llama.cpp";
     tag = llamaCppVersion;
-    hash = "sha256-pEDYgI3AMTU+cekvRX7NNt5wddznydQSNuerswvEpsA=";
+    hash = "sha256-xK7GHR5ywEgrgLAP8DVp+RjOV5065LT7XmpzBDOWf/0=";
   };
 
   wrapperOptions = [
@@ -152,16 +152,16 @@ let
 in
 goBuild (finalAttrs: {
   pname = "ollama";
-  version = "0.40.6";
+  version = "0.40.9";
 
   src = fetchFromGitHub {
     owner = "ollama";
     repo = "ollama";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-t3Asu9lIz8RW7xonHTJsTvtm1IEM6Rwfa0K5JN48Nwo=";
+    hash = "sha256-cUIgVbrQqlcbawdYdzNaGaZMBoPd45bvm3eJgT4R2+w=";
   };
 
-  vendorHash = "sha256-QBwZKRnmLUHQNSx5oqE9AbMINE8PP5TVJncG9nzQryI=";
+  vendorHash = "sha256-1mzJrZUHH2ouP6I+LVojHbft7No5AumqKZVq0I/Ubsg=";
   proxyVendor = true;
 
   env =
